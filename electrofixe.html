@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ElectroFix - Electrician On-Demand | 10 Min Service | Kalyani</title>
+    
+    <!-- Google Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, addDoc, getDocs, doc, setDoc, getDoc, updateDoc, query, where, orderBy, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        
+        window.firebaseConfig = {
+            apiKey: "AIzaSyAXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            authDomain: "your-project.firebaseapp.com",
+            projectId: "your-project",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:xxxxxxxxxxxxxxxxxx"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        window.db = getFirestore(app);
+        window.auth = getAuth(app);
+    </script>
+    
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --dark-bg: linear-gradient(145deg, #0c0c1a 0%, #1a1a2e 50%, #16213e 100%);
+            --glass-bg: rgba(255,255,255,0.08);
+            --glass-border: rgba(255,255,255,0.15);
+            --shadow-lg: 0 25px 50px -12px rgba(0,0,0,0.5);
+            --shadow-xl: 0 35px 80px -20px rgba(0,0,0,0.6);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--dark-bg);
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Animated Background Particles */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, #00d4ff, transparent),
+                radial-gradient(2px 2px at 40px 70px, #ff00ff, transparent),
+                radial-gradient(1px 1px at 90px 40px, #00ff88, transparent),
+                radial-gradient(1px 1px at 130px 80px, #ffff00, transparent);
+            background-repeat: repeat;
+            background-size: 200px 100px;
+            animation: float 20s infinite linear;
+            z-index: -1;
+            opacity: 0.3;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(0deg); }
+            100% { transform: translateY(-20px) rotate(360deg); }
+        }
+
+        /* Loading Screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: var(--dark-bg);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 5000;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-screen.hidden { opacity: 0; pointer-events: none; }
+
+        .loader {
+            width: 80px;
+            height: 80px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 2rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Auth Modal */
+        .auth-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(20px);
+            z-index: 3000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .auth-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .auth-container {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(30px);
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            padding: 4rem 3rem;
+            width: 90%;
+            max-width: 450px;
+            box-shadow: var(--shadow-xl);
+            transform: scale(0.8);
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .auth-modal.active .auth-container {
+            transform: scale(1);
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2.5rem;
+            border-radius: 50px;
+            background: rgba(255,255,255,0.05);
+            overflow: hidden;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 1rem 2rem;
+            background: transparent;
+            border: none;
+            color: rgba(255,255,255,0.7);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .auth-tab.active {
+            background: var(--primary-gradient);
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 20px 25px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            color: white;
+            font-size: 16px;
+            font-family: inherit;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+        }
+
+        .form-group input::placeholder {
+            color: rgba(255,255,255,0.6);
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #00d4ff;
+            background: rgba(255,255,255,0.15);
+            box-shadow: 0 0 0 4px rgba(0,212,255,0.2);
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 20px;
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 15px 35px rgba(102,126,234,0.4);
+            margin-top: 1rem;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 45px rgba(102,126,234,0.5);
+        }
+
+        .btn-secondary {
+            width: 100%;
+            padding: 20px;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 2px solid var(--glass-border);
+            border-radius: 20px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 1rem;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: #00d4ff;
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 1.5rem 5%;
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(30px);
+            border-bottom: 1px solid var(--glass-border);
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 2rem;
+            font-weight: 800;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo i {
+            font-size: 2.5rem;
+            background: var(--success-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .avatar {
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 20px;
+            box-shadow: var(--shadow-lg);
+            border: 3px solid rgba(255,255,255,0.2);
+        }
+
+        /* Main Content */
+        .main-content {
+            padding-top: 120px;
+            min-height: 100vh;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 6rem 5%;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: clamp(3rem, 8vw, 6rem);
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, #e0e6ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 2rem;
+            line-height: 1.1;
+        }
+
+        .hero p {
+            font-size: clamp(1.3rem, 4vw, 2rem);
+            color: rgba(255,255,255,0.85);
+            margin-bottom: 3rem;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .cta-btn {
+            padding: 25px 50px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            border-radius: 50px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .cta-user {
+            background: var(--success-gradient);
+            color: white;
+        }
+
+        .cta-electrician {
+            background: var(--secondary-gradient);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .cta-btn:hover {
+            transform: translateY(-12px) scale(1.05);
+            box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+        }
+
+        /* Services Grid */
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 3rem;
+            padding: 6rem 5%;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .service-card {
+            background: rgba(255,255,255,0.08);
+            backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            padding: 3.5rem 2.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.6s;
+        }
+
+        .service-card:hover::before {
+            left: 100%;
+        }
+
+        .service-card:hover {
+            transform: translateY(-20px) scale(1.05);
+            border-color: #00d4ff;
+            box-shadow: var(--shadow-xl);
+        }
+
+        .service-icon {
+            font-size: 5rem;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 2rem;
+            display: block;
+        }
+
+        .service-card h3 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .service-card p {
+            color: rgba(255,255,255,0.8);
+            font-size: 1.2rem;
+        }
+
+        /* Dashboard */
+        .dashboard {
+            padding: 6rem 5%;
+            max-width: 1400px;
+            margin: 0 auto;
+            display: none;
+        }
+
+        .dashboard.active {
+            display: block;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2.5rem;
+            margin-bottom: 4rem;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.08);
+            backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border);
+            border-radius: 25px;
+            padding: 3rem 2rem;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-10px);
+        }
+
+        .stat-number {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: var(--success-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+        }
+
+        /* Jobs List */
+        .jobs-list {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(25px);
+            border-radius: 25px;
+            padding: 3rem;
+            border: 1px solid var(--glass-border);
+        }
+
+        .job-item {
+            background: rgba(255,255,255,0.03);
+            padding: 2.5rem;
+            border-radius: 20px;
+            margin-bottom: 2rem;
+            border-left: 5px solid #00d4ff;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .job-item:hover {
+            transform: translateX(15px);
+            border-left-color: #00ff88;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .job-item.accepted {
+            border-left-color: #00ff88;
+            background: rgba(0,255,136,0.1);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header { padding: 1.5rem 5%; }
+            .cta-buttons { flex-direction: column; align-items: center; }
+            .cta-btn { justify-content: center; }
+            .services-grid { grid-template-columns: 1fr; padding: 3rem 5%; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .auth-container { padding: 2.5rem 2rem; margin: 1rem; }
+        }
+
+        .hidden { display: none !important; }
+        .text-center { text-align: center; }
+        .mb-4 { margin-bottom: 2rem; }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loader"></div>
+        <h2 style="font-size: 1.8rem; font-weight: 600;">Connecting to ElectroFix...</h2>
+    </div>
+
+    <!-- Auth Modal -->
+    <div class="auth-modal" id="authModal">
+        <div class="auth-container">
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchTab('register')">Register</button>
+                <button class="auth-tab" onclick="switchTab('login')">Login</button>
+            </div>
+            
+            <!-- Registration Form -->
+            <form id="registerForm" class="auth-form">
+                <div class="form-group">
+                    <input type="text" id="regFullName" placeholder="Full Name" required>
+                </div>
+                <div class="form-group">
+                    <input type="email" id="regEmail" placeholder="Email Address" required>
+                </div>
+                <div class="form-group">
+                    <input type="tel" id="regPhone" placeholder="Phone (+880)" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="regPassword" placeholder="Password (8+ chars)" required>
+                </div>
+                <div class="form-group">
+                    <select id="userType" required>
+                        <option value="">Select Role</option>
+                        <option value="customer">Customer</option>
+                        <option value="electrician">Electrician</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-user-plus"></i> Create Account
+                </button>
+            </form>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form hidden">
+                <div class="form-group">
+                    <input type="email" id="loginEmail" placeholder="Email Address" required>
+                </div>
+                <div class="form-group">
+                    <input type="password" id="loginPassword" placeholder="Password" required>
+                </div>
+                <div class="form-group">
+                    <select id="loginUserType" required>
+                        <option value="">Select Role</option>
+                        <option value="customer">Customer</option>
+                        <option value="electrician">Electrician</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-sign-in-alt"></i> Login
+                </button>
+            </form>
+
+            <button class="btn-secondary" onclick="closeAuthModal()">
+                <i class="fas fa-times"></i> Close
+            </button>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">
+            <i class="fas fa-bolt"></i>
+            <span>ElectroFix</span>
+        </div>
+        <div class="user-profile" id="userProfile" style="display: none;">
+            <div class="avatar" id="userAvatar"></div>
+            <span id="userNameDisplay" style="font-weight: 600;"></span>
+            <button onclick="logout()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Hero Section -->
+        <section class="hero" id="heroSection">
+            <h1>Electrician in <span style="background: var(--success-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">10 Minutes</span></h1>
+            <p>24/7 Emergency Service | Licensed Electricians | 100% Satisfaction Guaranteed | Dhaka Coverage</p>
+            <div class="cta-buttons">
+                <a href="#" class="cta-btn cta-user" onclick="openAuthModal('customer')">
+                    <i class="fas fa-user"></i>
+                    Book Service Now
+                </a>
+                <a href="#" class="cta-btn cta-electrician" onclick="openAuthModal('electrician')">
+                    <i class="fas fa-hard-hat"></i>
+                    Electrician Panel
+                </a>
+            </div>
+        </section>
+
+        <!-- Customer Services -->
+        <section class="services-grid" id="servicesSection" style="display: none;">
+            <div class="service-card" data-service="ac">
+                <i class="fas fa-fan service-icon"></i>
+                <h3>AC Service</h3>
+                <p>Repair • Gas Refill • Deep Cleaning • Installation</p>
+            </div>
+            <div class="service-card" data-service="fridge">
+                <i class="fas fa-snowflake service-icon"></i>
+                <h3>Fridge Repair</h3>
+                <p>Compressor • Cooling Issues • Gas Leakage • Defrosting</p>
+            </div>
+            <div class="service-card" data-service="washing">
+                <i class="fas fa-tshirt service-icon"></i>
+                <h3>Washing Machine</h3>
+                <p>Motor • Pump • Control Panel • Leakage</p>
+            </div>
+            <div class="service-card" data-service="wiring">
+                <i class="fas fa-plug service-icon"></i>
+                <h3>Electrical Wiring</h3>
+                <p>Socket • Switch • Panel • New Wiring</p>
+            </div>
+            <div class="service-card" data-service="lighting">
+                <i class="fas fa-lightbulb service-icon"></i>
+                <h3>Lighting</h3>
+                <p>LED • Tube Light • Chandelier • Emergency Light</p>
+            </div>
+            <div class="service-card" data-service="generator">
+                <i class="fas fa-bolt service-icon"></i>
+                <h3>Generator</h3>
+                <p>Installation • Repair • Load Testing • Maintenance</p>
+            </div>
+        </section>
+
+        <!-- Electrician Dashboard -->
+        <div class="dashboard" id="electricianDashboard">
+            <div class="text-center mb-4">
+                <h2 style="font-size: 3.5rem; font-weight: 800; background: var(--success-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1rem;">
+                    Welcome Back!
+                </h2>
+                <p style="font-size: 1.4rem; color: rgba(255,255,255,0.8);">Manage your jobs and earnings</p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalJobs">0</div>
+                    <div>Total Jobs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="rating">0</div>
+                    <div>Avg Rating</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="earnings">৳0</div>
+                    <div>This Month</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="pendingJobs">0</div>
+                    <div>Pending Jobs</div>
+                </div>
+            </div>
+
+            <div class="jobs-list">
+                <h3 style="font-size: 2.5rem; margin-bottom: 2.5rem; display: flex; align-items: center; gap: 1rem;">
+                    <i class="fas fa-tasks"></i> New Job Requests
+                </h3>
+                <div id="jobsContainer">
+                    <div style="text-align: center; color: rgba(255,255,255,0.5); padding: 3rem;">
+                        No new jobs yet. Check back soon!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global State
+        let currentUser = null;
+        let userType = null;
+
+        // Initialize App
+        async function initApp() {
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate loading
+            document.getElementById('loadingScreen').classList.add('hidden');
+            
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    currentUser = user;
+                    const userDoc = await getDoc(doc(db, 'users', user.uid));
+                    if (userDoc.exists()) {
+                        const userData = userDoc.data();
+                        updateUserProfile(userData);
+                        showDashboard(userData.role);
+                    }
+                }
+            });
+        }
+
+        // Auth Functions
+        window.openAuthModal = function(type) {
+            userType = type;
+            document.getElementById('userType').value = type;
+            document.getElementById('loginUserType').value = type;
+            document.getElementById('authModal').classList.add('active');
+            document.getElementById('heroSection').style.display = 'none';
+        };
+
+        window.closeAuthModal = function() {
+            document.getElementById('authModal').classList.remove('active');
+            document.getElementById('heroSection').style.display = 'block';
+            document.querySelectorAll('.auth-form').forEach(form => form.reset());
+        };
+
+        window.switchTab = function(tab) {
+            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.auth-form').forEach(f => f.classList.add('hidden'));
+            event.target.classList.add('active');
+            document.getElementById(tab === 'register' ? 'registerForm' : 'loginForm').classList.remove('hidden');
+        };
+
+        // Registration
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fullName = document.getElementById('regFullName').value;
+            const email = document.getElementById('regEmail').value;
+            const phone = document.getElementById('regPhone').value;
+            const password = document.getElementById('regPassword').value;
+            const role = document.getElementById('userType').value;
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                await setDoc(doc(db, 'users', userCredential.user.uid), {
+                    fullName,
+                    email,
+                    phone,
+                    role,
+                    rating: 0,
+                    totalJobs: 0,
+                    earnings: 0,
+                    createdAt: serverTimestamp(),
+                    isOnline: true,
+                    area: role === 'electrician' ? 'Dhanmondi' : '', // Default area
+                    verified: role === 'electrician' ? false : true
+                });
+
+                currentUser = userCredential.user;
+                updateUserProfile({ fullName, role });
+                showDashboard(role);
+                closeAuthModal();
+            } catch (error) {
+                alert('Registration failed: ' + error.message);
+            }
+        });
+
+        // Login
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const role = document.getElementById('loginUserType').value;
+
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+                if (userDoc.exists() && userDoc.data().role === role) {
+                    currentUser = userCredential.user;
+                    updateUserProfile(userDoc.data());
+                    showDashboard(role);
+                    closeAuthModal();
+                } else {
+                    alert('User role mismatch or not found!');
+                }
+            } catch (error) {
+                alert('Login failed: ' + error.message);
+            }
+        });
+
+        // Update Profile
+        function updateUserProfile(userData) {
+            document.getElementById('userNameDisplay').textContent = userData.fullName;
+            document.getElementById('userAvatar').textContent = userData.fullName.charAt(0).toUpperCase();
+            document.getElementById('userProfile').style.display = 'flex';
+        }
+
+        // Show Dashboard
+        function showDashboard(role) {
+            document.getElementById('heroSection').style.display = 'none';
+            document.getElementById('servicesSection').style.display = role === 'customer' ? 'grid' : 'none';
+            document.getElementById('electricianDashboard').classList.toggle('active', role === 'electrician');
+            
+            if (role === 'electrician') {
+                loadElectricianDashboard();
+            }
+        }
+
+        // Electrician Dashboard
+        async function loadElectricianDashboard() {
+            const jobsSnapshot = await getDocs(query(
+                collection(db, 'jobs'), 
+                where('status', '==', 'pending'),
+                orderBy('createdAt', 'desc')
+            ));
+            
+            const jobsContainer = document.getElementById('jobsContainer');
+            jobsContainer.innerHTML = '';
+
+            let totalJobs = 0, pendingJobs = 0, earnings = 0;
+            
+            jobsSnapshot.forEach(doc => {
+                const job = doc.data();
+                totalJobs++;
+                pendingJobs++;
+                createJobCard(doc.id, job);
+            });
+
+            // Update stats
+            document.getElementById('totalJobs').textContent = totalJobs;
+            document.getElementById('pendingJobs').textContent = pendingJobs;
+            document.getElementById('earnings').textContent = `৳${earnings.toLocaleString()}`;
+        }
+
+        function createJobCard(jobId, job) {
+            const jobCard = document.createElement('div');
+            jobCard.className = 'job-item';
+            jobCard.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
+                    <h4 style="font-size: 1.5rem; margin: 0;">🔧 ${job.service} - ${job.area}</h4>
+                    <span style="background: rgba(0,212,255,0.2); padding: 8px 16px; border-radius: 20px; font-weight: 600;">৳${job.price}</span>
+                </div>
+                <p><strong>Customer:</strong> ${job.customerName} | <strong>Phone:</strong> ${job.phone}</p>
+                <p><strong>Address:</strong> ${job.address}</p>
+                <p><strong>Time:</strong> ${new Date(job.createdAt.toDate()).toLocaleString('en-BD')}</p>
+                <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+                    <button onclick="acceptJob('${jobId}')" class="btn-primary" style="flex: 1;">
+                        ✅ Accept Job
+                    </button>
+                    <a href="tel:${job.phone}" class="btn-secondary" style="flex: 1; text-align: center; padding: 20px;">
+                        📞 Call
+                    </a>
+                </div>
+            `;
+            document.getElementById('jobsContainer').appendChild(jobCard);
+        }
+
+        window.acceptJob = async function(jobId) {
+            await updateDoc(doc(db, 'jobs', jobId), {
+                status: 'accepted',
+                electricianId: currentUser.uid,
+                updatedAt: serverTimestamp()
+            });
+            loadElectricianDashboard();
+        };
+
+        // Customer Service Selection
+        document.querySelectorAll('.service-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const service = this.dataset.service;
+                const serviceName = this.querySelector('h3').textContent;
+                
+                // Create job in Firestore
+                addDoc(collection(db, 'jobs'), {
+                    customerId: currentUser.uid,
+                    customerName: document.getElementById('userNameDisplay').textContent,
+                    service: serviceName,
+                    serviceType: service,
+                    area: 'Dhanmondi', // Get from location input later
+                    address: 'Customer Address',
+                    phone: '+8801234567890', // Get from user profile
+                    price: 800,
+                    status: 'pending',
+                    createdAt: serverTimestamp()
+                }).then(() => {
+                    alert(`✅ ${serviceName} booked successfully! Electricians notified.`);
+                });
+            });
+        });
+
+        // Logout
+        window.logout = async function() {
+            await signOut(auth);
+            currentUser = null;
+            document.getElementById('userProfile').style.display = 'none';
+            document.querySelectorAll('.dashboard, #servicesSection').forEach(el => el.classList.remove('active'));
+            document.getElementById('heroSection').style.display = 'block';
+        };
+
+        // Initialize
+        initApp();
+    </script>
+</body>
+</html>
